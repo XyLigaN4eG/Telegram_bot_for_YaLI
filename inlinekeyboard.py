@@ -1,12 +1,11 @@
-import logging
-
 from telegram import ReplyKeyboardMarkup
 from telegram.ext import (Updater, CommandHandler, MessageHandler, Filters,
-                          ConversationHandler)
+                          ConversationHandler, PicklePersistence)
+
+import logging
 
 REQUEST_KWARGS = {
     'proxy_url': 'socks5://96.113.176.101:1080'}
-
 # Enable logging
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
                     level=logging.INFO)
@@ -31,23 +30,28 @@ def facts_to_str(user_data):
 
 
 def start(update, context):
-    update.message.reply_text(
-        "Привет! Я бот, который может помочь тебе выбрать рейс. Давайте для начала познакомимся, как мне к Вам обращаться?",
-        )
+    reply_text = "Hi! My name is Doctor Botter."
+    if context.user_data:
+        reply_text += " You already told me your {}. Why don't you tell me something more " \
+                      "about yourself? Or change anything I " \
+                      "already know.".format(", ".join(context.user_data.keys()))
+    else:
+        reply_text += " I will hold a more complex conversation with you. Why don't you tell me " \
+                      "something about yourself?"
+    update.message.reply_text(reply_text, reply_markup=markup)
 
     return CHOOSING
 
 
-def help(update, context):
-    """Send a message when the command /help is issued."""
-    update.message.reply_text('Nice dick. Awesome balls')
-
-
 def regular_choice(update, context):
-    text = update.message.text
+    text = update.message.text.lower()
     context.user_data['choice'] = text
-    update.message.reply_text(
-        'Your {}? Yes, I would love to hear about that!'.format(text.lower()))
+    if context.user_data.get(text):
+        reply_text = 'Your {}, I already know the following ' \
+                     'about that: {}'.format(text, context.user_data[text])
+    else:
+        reply_text = 'Your {}? Yes, I would love to hear about that!'.format(text)
+    update.message.reply_text(reply_text)
 
     return TYPING_REPLY
 
@@ -60,30 +64,32 @@ def custom_choice(update, context):
 
 
 def received_information(update, context):
-    user_data = context.user_data
     text = update.message.text
-    category = user_data['choice']
-    user_data[category] = text
-    del user_data['choice']
+    category = context.user_data['choice']
+    context.user_data[category] = text.lower()
+    del context.user_data['choice']
 
     update.message.reply_text("Neat! Just so you know, this is what you already told me:"
-                              "{} You can tell me more, or change your opinion"
-                              " on something.".format(facts_to_str(user_data)),
+                              "{}"
+                              "You can tell me more, or change your opinion on "
+                              "something.".format(facts_to_str(context.user_data)),
                               reply_markup=markup)
 
     return CHOOSING
 
 
+def show_data(update, context):
+    update.message.reply_text("This is what you already told me:"
+                              "{}".format(facts_to_str(context.user_data)))
+
+
 def done(update, context):
-    user_data = context.user_data
-    if 'choice' in user_data:
-        del user_data['choice']
+    if 'choice' in context.user_data:
+        del context.user_data['choice']
 
     update.message.reply_text("I learned these facts about you:"
                               "{}"
-                              "Until next time!".format(facts_to_str(user_data)))
-
-    user_data.clear()
+                              "Until next time!".format(facts_to_str(context.user_data)))
     return ConversationHandler.END
 
 
@@ -94,10 +100,8 @@ def error(update, context):
 
 def main():
     # Create the Updater and pass it your bot's token.
-    # Make sure to set use_context=True to use the new context based callbacks
-    # Post version 12 this will no longer be necessary
-    updater = Updater("1291892923:AAGFf_G_ETvtISyXJC9_tSJnZAG9hPdVnDA", use_context=True,
-                      request_kwargs=REQUEST_KWARGS)
+    pp = PicklePersistence(filename='conversationbot')
+    updater = Updater("719309973:AAF-hkTc61L07XjVxPy08eM6elxzWIMaq3Y", persistence=pp, use_context=True, request_kwargs=REQUEST_KWARGS)
 
     # Get the dispatcher to register handlers
     dp = updater.dispatcher
@@ -110,11 +114,11 @@ def main():
             CHOOSING: [MessageHandler(Filters.regex('^(Age|Favourite colour|Number of siblings)$'),
                                       regular_choice),
                        MessageHandler(Filters.regex('^Something else...$'),
-                                      custom_choice)
+                                      custom_choice),
                        ],
 
             TYPING_CHOICE: [MessageHandler(Filters.text,
-                                           regular_choice)
+                                           regular_choice),
                             ],
 
             TYPING_REPLY: [MessageHandler(Filters.text,
@@ -122,11 +126,15 @@ def main():
                            ],
         },
 
-        fallbacks=[MessageHandler(Filters.regex('^Done$'), done)]
+        fallbacks=[MessageHandler(Filters.regex('^Done$'), done)],
+        name="my_conversation",
+        persistent=True
     )
 
     dp.add_handler(conv_handler)
 
+    show_data_handler = CommandHandler('show_data', show_data)
+    dp.add_handler(show_data_handler)
     # log all errors
     dp.add_error_handler(error)
 

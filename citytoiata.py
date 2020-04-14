@@ -4,7 +4,7 @@ import requests
 def city_to_iata():
     api_server = "https://www.travelpayouts.com/widgets_suggest_params"
     params = {
-        "q": input()
+        "q": input("Введите пункт отправления и пункт назначения. Например: из Сочи в Москву\n")
 
     }
     try:
