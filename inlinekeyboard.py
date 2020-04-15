@@ -1,151 +1,158 @@
+# Импортируем необходимые классы.
 from telegram import ReplyKeyboardMarkup
-from telegram.ext import (Updater, CommandHandler, MessageHandler, Filters,
-                          ConversationHandler, PicklePersistence)
+from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, ConversationHandler, PicklePersistence, \
+    CallbackContext
+import sys
+import requests
 
-import logging
+reply_keyboard = [['/address', '/phone'],
+                  ['/site', '/work_time']]
+markup = ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=False)
 
 REQUEST_KWARGS = {
-    'proxy_url': 'socks5://96.113.176.101:1080'}
-# Enable logging
-logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-                    level=logging.INFO)
-
-logger = logging.getLogger(__name__)
-
-CHOOSING, TYPING_REPLY, TYPING_CHOICE = range(3)
-
-reply_keyboard = [['Age', 'Favourite colour'],
-                  ['Number of siblings', 'Something else...'],
-                  ['Done']]
-markup = ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=True)
-
-
-def facts_to_str(user_data):
-    facts = list()
-
-    for key, value in user_data.items():
-        facts.append('{} - {}'.format(key, value))
-
-    return "\n".join(facts).join(['\n', '\n'])
+    'proxy_url': 'socks5://orbtl.s5.opennetwork.cc:999',
+    'urllib3_proxy_kwargs': {
+        'username': '429604643',
+        'password': '3mDjU04i'}
+}
 
 
 def start(update, context):
-    reply_text = "Hi! My name is Doctor Botter."
-    if context.user_data:
-        reply_text += " You already told me your {}. Why don't you tell me something more " \
-                      "about yourself? Or change anything I " \
-                      "already know.".format(", ".join(context.user_data.keys()))
-    else:
-        reply_text += " I will hold a more complex conversation with you. Why don't you tell me " \
-                      "something about yourself?"
-    update.message.reply_text(reply_text, reply_markup=markup)
+    update.message.reply_text(
+        "Привет. Пройдите небольшой опрос, пожалуйста!\n"
+        "Вы можете прервать опрос, послав команду /stop.\n"
+        "В каком городе вы живёте?")
 
-    return CHOOSING
-
-
-def regular_choice(update, context):
-    text = update.message.text.lower()
-    context.user_data['choice'] = text
-    if context.user_data.get(text):
-        reply_text = 'Your {}, I already know the following ' \
-                     'about that: {}'.format(text, context.user_data[text])
-    else:
-        reply_text = 'Your {}? Yes, I would love to hear about that!'.format(text)
-    update.message.reply_text(reply_text)
-
-    return TYPING_REPLY
+    # Число-ключ в словаре states —
+    # втором параметре ConversationHandler'а.
+    return 1
+    # Оно указывает, что дальше на сообщения от этого пользователя
+    # должен отвечать обработчик states[1].
+    # До этого момента обработчиков текстовых сообщений
+    # для этого пользователя не существовало,
+    # поэтому текстовые сообщения игнорировались.
 
 
-def custom_choice(update, context):
-    update.message.reply_text('Alright, please send me the category first, '
-                              'for example "Most impressive skill"')
-
-    return TYPING_CHOICE
+def help(update, context):
+    update.message.reply_text(
+        "Я пока не умею помогать... Я только ваше эхо.")
 
 
-def received_information(update, context):
-    text = update.message.text
-    category = context.user_data['choice']
-    context.user_data[category] = text.lower()
-    del context.user_data['choice']
-
-    update.message.reply_text("Neat! Just so you know, this is what you already told me:"
-                              "{}"
-                              "You can tell me more, or change your opinion on "
-                              "something.".format(facts_to_str(context.user_data)),
-                              reply_markup=markup)
-
-    return CHOOSING
+def address(update, context):
+    update.message.reply_text(
+        "Адрес: г. Москва, ул. Льва Толстого, 16")
 
 
-def show_data(update, context):
-    update.message.reply_text("This is what you already told me:"
-                              "{}".format(facts_to_str(context.user_data)))
+def phone(update, context):
+    update.message.reply_text("Телефон: +7(495)776-3030")
 
 
-def done(update, context):
-    if 'choice' in context.user_data:
-        del context.user_data['choice']
-
-    update.message.reply_text("I learned these facts about you:"
-                              "{}"
-                              "Until next time!".format(facts_to_str(context.user_data)))
-    return ConversationHandler.END
+def site(update, context):
+    update.message.reply_text(
+        "Сайт: http://www.yandex.ru/company")
 
 
-def error(update, context):
-    """Log Errors caused by Updates."""
-    logger.warning('Update "%s" caused error "%s"', update, context.error)
+def first_response(update, context):
+    # Сохраняем ответ в словаре.
+    context.user_data['locality'] = update.message.text
+    update.message.reply_text(
+        "Какая погода в городе {0}?".format(context.user_data['locality']))
+    return 2
+
+
+# Добавили словарь user_data в параметры.
+def second_response(update, context):
+    weather = update.message.text
+    # Используем user_data в ответе.
+    update.message.reply_text("Спасибо за участие в опросе! Привет, {0}!".
+                              format(context.user_data['locality']))
+
+    return 3
+
+
+# Определяем функцию-обработчик сообщений.
+# У неё два параметра, сам бот и класс updater, принявший сообщение.
+
+
+def third_response(update, context):
+    toponym_to_find = " ".join(sys.argv[1:])
+    geocoder_api_server = "http://geocode-maps.yandex.ru/1.x/"
+    geocoder_params = {
+        "apikey": "40d1649f-0493-4b70-98ba-98533de7710b",
+        "geocode": update.message.text,
+        "format": "json"}
+    response = requests.get(geocoder_api_server, params=geocoder_params)
+
+    if not response:
+        print("Ошибка выполнения запроса:")
+        print(geocoder_api_server)
+        print("Http статус:", response.status_code, "(", response.reason, ")")
+        exit()
+
+    json_response = response.json()
+    toponym = json_response["response"]["GeoObjectCollection"]["featureMember"][0]["GeoObject"]
+    toponym_address = toponym["metaDataProperty"]["GeocoderMetaData"]["text"]
+    toponym_coodrinates = toponym["Point"]["pos"]
+
+    geocoder_api_server = "http://geocode-maps.yandex.ru/1.x/"
+    geocoder_params = {
+        "apikey": "40d1649f-0493-4b70-98ba-98533de7710b",
+        "geocode": toponym_coodrinates,
+        "kind": "district",
+        "format": "json"
+    }
+
+    response = requests.get(geocoder_api_server, params=geocoder_params)
+    json_response = response.json()
+    toponym_2 = json_response["response"]["GeoObjectCollection"]["featureMember"][0]["GeoObject"]["metaDataProperty"][
+        "GeocoderMetaData"]["Address"]["Components"][-1]['name']
+    update.message.reply_text(toponym_2)
+
+
+def stop(update, context):
+    update.message.reply_text("I learned these facts about you, until next time!")
 
 
 def main():
-    # Create the Updater and pass it your bot's token.
-    pp = PicklePersistence(filename='conversationbot')
-    updater = Updater("719309973:AAF-hkTc61L07XjVxPy08eM6elxzWIMaq3Y", persistence=pp, use_context=True, request_kwargs=REQUEST_KWARGS)
+    # Создаём объект updater.
+    # Вместо слова "TOKEN" надо разместить полученный от @BotFather токен
+    updater = Updater("1213624266:AAFEhfCRLn-0nGulWqs5RJMrSJqgUhG8Q9s", use_context=True,
+                      request_kwargs=REQUEST_KWARGS)
 
-    # Get the dispatcher to register handlers
+    # Получаем из него диспетчер сообщений.
     dp = updater.dispatcher
 
-    # Add conversation handler with the states CHOOSING, TYPING_CHOICE and TYPING_REPLY
     conv_handler = ConversationHandler(
+        # Точка входа в диалог.
+        # В данном случае — команда /start. Она задаёт первый вопрос.
         entry_points=[CommandHandler('start', start)],
 
+        # Состояние внутри диалога.
+        # Вариант с двумя обработчиками, фильтрующими текстовые сообщения.
         states={
-            CHOOSING: [MessageHandler(Filters.regex('^(Age|Favourite colour|Number of siblings)$'),
-                                      regular_choice),
-                       MessageHandler(Filters.regex('^Something else...$'),
-                                      custom_choice),
-                       ],
-
-            TYPING_CHOICE: [MessageHandler(Filters.text,
-                                           regular_choice),
-                            ],
-
-            TYPING_REPLY: [MessageHandler(Filters.text,
-                                          received_information),
-                           ],
+            # Функция читает ответ на первый вопрос и задаёт второй.
+            1: [MessageHandler(Filters.text, first_response, pass_user_data=True)],
+            # Функция читает ответ на второй вопрос и завершает диалог.
+            2: [MessageHandler(Filters.text, second_response, pass_user_data=True)],
+            3: [MessageHandler(Filters.text, third_response, pass_user_data=True)],
         },
 
-        fallbacks=[MessageHandler(Filters.regex('^Done$'), done)],
-        name="my_conversation",
-        persistent=True
+        # Точка прерывания диалога. В данном случае — команда /stop.
+        fallbacks=[CommandHandler("stop", stop)]
     )
-
     dp.add_handler(conv_handler)
-
-    show_data_handler = CommandHandler('show_data', show_data)
-    dp.add_handler(show_data_handler)
-    # log all errors
-    dp.add_error_handler(error)
-
-    # Start the Bot
+    dp.add_handler(CommandHandler("start", start))
+    dp.add_handler(CommandHandler("help", help))
+    dp.add_handler(CommandHandler("address", address))
+    dp.add_handler(CommandHandler("phone", phone))
+    dp.add_handler(CommandHandler("site", site))
     updater.start_polling()
 
-    # Run the bot until you press Ctrl-C or the process receives SIGINT,
-    # SIGTERM or SIGABRT. This should be used most of the time, since
-    # start_polling() is non-blocking and will stop the bot gracefully.
+    # Ждём завершения приложения.
+    # (например, получения сигнала SIG_TERM при нажатии клавиш Ctrl+C)
     updater.idle()
 
 
+# Запускаем функцию main() в случае запуска скрипта.
 if __name__ == '__main__':
     main()
