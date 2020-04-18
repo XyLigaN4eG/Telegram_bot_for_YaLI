@@ -1,15 +1,16 @@
 import sys
-
-import requests
+from flask import Flask
 from citytoiata import city_to_iata
 from fly_requests import fly_requests
 from telegram import ReplyKeyboardMarkup
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, ConversationHandler, PicklePersistence, \
     CallbackContext
+from data import db_session
 
 CITY_NAME, ONE_WAY, BEGINNING_OF_PERIOD, TRIP_DURATION, LIMITER, REQUESTER = range(6)
-
+db_session.global_init("db/local_requests.sqlite")
 reply_keyboard = [['Да', 'Нет']]
+reply_keyboard_date = [[f'']]
 markup = ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=True, resize_keyboard=True)
 REQUEST_KWARGS = {
     'proxy_url': 'socks5://orbtl.s5.opennetwork.cc:999',
@@ -154,7 +155,7 @@ def stop(update, context):
 
     update.message.reply_text('Пока! Надеюсь, что я вам помог.')
 
-    return END
+    return ConversationHandler.END
 
 
 def main():

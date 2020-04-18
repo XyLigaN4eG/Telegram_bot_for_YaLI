@@ -1,5 +1,6 @@
 import requests
-from citytoiata import city_to_iata
+from data import db_session
+from data.local_requests import LocalRequests
 
 
 def fly_requests(user_dict):
@@ -31,7 +32,6 @@ def fly_requests(user_dict):
                 "повторить запрос в другое время.")
         count = 0
         for i in json_response["data"]:
-
             data_list.append([])
             data_list[count].append("Город(аэропорт) отправления: " + i["origin"])
             data_list[count].append("Город(аэропорт) прибытия: " + i["destination"])
@@ -45,3 +45,9 @@ def fly_requests(user_dict):
         return "К сожалению, один из городов отсутствует в моей базе данных. Проверьте написание или попытайтесь позже."
 
 
+user = LocalRequests()
+user.origin = "Пользователь 1"
+user.destination = "биография пользователя 1"
+session = db_session.create_session()
+session.add(user)
+session.commit()

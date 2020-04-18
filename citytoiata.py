@@ -1,5 +1,5 @@
 import requests
-
+import datetime
 
 def city_to_iata(text):
     api_server = "https://www.travelpayouts.com/widgets_suggest_params"
@@ -14,3 +14,6 @@ def city_to_iata(text):
 
     except KeyError:
         pass
+
+
+print(datetime.datetime.now())
