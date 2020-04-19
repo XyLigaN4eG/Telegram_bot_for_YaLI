@@ -1,9 +1,15 @@
 import requests
 from data import db_session
 from data.local_requests import LocalRequests
+from flask import Flask
+
+db_session.global_init("db/local_requests.sqlite")
+app = Flask(__name__)
+app.config['SECRET_KEY'] = 'yandexlyceum_secret_key'
 
 
 def fly_requests(user_dict):
+    success = 8
     data_list = []
     if user_dict['or'] == user_dict['dest']:
         return f"Ой-ой, мне кажется, что город, который Вы хотите полететь, совпадает с городом, куда Вы" \
@@ -18,6 +24,7 @@ def fly_requests(user_dict):
         "one_way": user_dict['one_way'],
         "beginning_of_period ": user_dict['date'],
         "trip_duration": user_dict['trip_duration']
+
     }
 
     header = {"X-Access-Token": "89e51b8e23c27d19fed4665455236f7f"}
@@ -27,27 +34,22 @@ def fly_requests(user_dict):
     json_response = response.json()
     try:
         if len(json_response["data"]) == 0:
-            print(
-                "Упс, мне сообщили, что таких рейсов сейчас нет. Мне очень жаль, попробуйте "
-                "повторить запрос в другое время.")
-        count = 0
-        for i in json_response["data"]:
-            data_list.append([])
-            data_list[count].append("Город(аэропорт) отправления: " + i["origin"])
-            data_list[count].append("Город(аэропорт) прибытия: " + i["destination"])
-            data_list[count].append(str(i["value"]) + " рублей")
-            data_list[count].append("Время отправления: " + str(i["depart_date"]).replace("-", '.'))
-            data_list[count].append("Время возвращения: " + str(i["return_date"]).replace("-", '.'))
-            data_list[count].append("количество пересадок: " + str(i["number_of_changes"]))
-            count += 1
-        return data_list
+            return "Упс, мне сообщили, что таких рейсов сейчас нет. Мне очень жаль, попробуйте повторить запрос" \
+                   " в другое время."
+        else:
+            for i in json_response["data"]:
+                db_parser = LocalRequests()
+                db_parser.origin = ("Город(аэропорт) отправления: " + i["origin"])
+                db_parser.destination = ("Город(аэропорт) прибытия: " + i["destination"])
+                db_parser.value = (str(i["value"]) + " рублей")
+                db_parser.depart_date = ("Время отправления: " + str(i["depart_date"]).replace("-", '.'))
+                db_parser.return_date = ("Время возвращения: " + str(i["return_date"]).replace("-", '.'))
+                db_parser.number_of_changes = ("Количество пересадок: " + str(i["number_of_changes"]))
+                db_parser.gate = i['gate']
+                session = db_session.create_session()
+                session.add(db_parser)
+                session.commit()
+        return success
+
     except KeyError:
         return "К сожалению, один из городов отсутствует в моей базе данных. Проверьте написание или попытайтесь позже."
-
-
-user = LocalRequests()
-user.origin = "Пользователь 1"
-user.destination = "биография пользователя 1"
-session = db_session.create_session()
-session.add(user)
-session.commit()

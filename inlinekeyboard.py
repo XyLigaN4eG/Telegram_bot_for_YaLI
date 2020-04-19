@@ -1,12 +1,16 @@
-import sys
-from flask import Flask
+from data import db_session
+import logging
+from data.local_requests import LocalRequests
 from citytoiata import city_to_iata
 from fly_requests import fly_requests
 from telegram import ReplyKeyboardMarkup
-from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, ConversationHandler, PicklePersistence, \
-    CallbackContext
-from data import db_session
+from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, ConversationHandler
 
+logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+                    level=logging.INFO)
+
+logger = logging.getLogger(__name__)
+db_session.global_init("db/local_requests.sqlite")
 CITY_NAME, ONE_WAY, BEGINNING_OF_PERIOD, TRIP_DURATION, LIMITER, REQUESTER = range(6)
 db_session.global_init("db/local_requests.sqlite")
 reply_keyboard = [['Да', 'Нет']]
@@ -20,16 +24,23 @@ REQUEST_KWARGS = {
 }
 
 
+def help(update, context):
+    update.message.reply_text("Моей основной задачей является подбор авиабилетов, но вот с их "
+                              "покупкой я пока не дружу :(\n Пропишите  команду /start, чтобы начать выбор билетов,"
+                              "или команду /stop, чтобы прервать мою работу")
+
+
 def start(update, context):
     update.message.reply_text(
         "Привет. Я бот, который поможет вам купить авиабилеты!\n"
-        "Вы можете прервать мою работу, послав команду /stop.\n"
+        "Вы можете узнать, на что я способен, просто прописав команду /help.\n"
         "Откуда и куда вы хотите направиться? Пример: из Казани в Москву")
+
     return CITY_NAME
 
 
 def city_name(update, context):
-    dest_and_origin = str(city_to_iata(update.message.text)).split(",")
+    dest_and_origin = str(city_to_iata(update.message.text, context.user_data)).split(",")
     context.user_data['or'] = dest_and_origin[0].replace("(", "").replace(")", "").replace("'", "")
     context.user_data['dest'] = dest_and_origin[1].replace("(", "").replace(")", "").replace("'", "").replace(" ", "")
     if context.user_data['or'] == context.user_data['dest']:
@@ -42,11 +53,11 @@ def city_name(update, context):
 
 
 def one_way(update, context):
-    if str(update.message.text).lower == "да" or str(update.message.text) == "Да":
+    if str(update.message.text) == "да" or str(update.message.text) == "Да" or str(update.message.text) == "ДА":
         context.user_data['one_way'] = "false"
-        update.message.reply_text("Какова будет длительность путешествия в неделях.")
+        update.message.reply_text("Какова будет длительность путешествия в неделях?")
         return TRIP_DURATION
-    elif str(update.message.text).lower == 'нет' or str(update.message.text) == "Нет":
+    elif str(update.message.text) == 'нет' or str(update.message.text) == "Нет" or str(update.message.text) == 'НЕТ':
         context.user_data['one_way'] = "true"
 
         update.message.reply_text("Введите первое число месяца, в который будут попадать даты отправления.(DD.MM.YYYY)")
@@ -112,7 +123,6 @@ def limiter(update, context):
         limit_name = str(update.message.text).split(" ")
         if str(limit_name[0]).isdigit():
             context.user_data['limit'] = limit_name[0]
-            print(1)
             return REQUESTER
         else:
             update.message.reply_text("Вы неправильно ввели максимальное количество предложений. Попробуйте ещё раз.")
@@ -123,39 +133,25 @@ def limiter(update, context):
 
 
 def requester(update, context):
-    for i in range(len(fly_requests(context.user_data))):
-        if len(str(fly_requests(context.user_data)[i][3])) < 1:
-            if len(str(fly_requests(context.user_data)[i][4])) < 1:
-                if len(str(fly_requests(context.user_data)[i][5])) < 1:
-                    update.message.reply_text(str(fly_requests(context.user_data)[i][0] + "\n") +
-                                              str(fly_requests(context.user_data)[i][1] + "\n") +
-                                              str(fly_requests(context.user_data)[i][2] + "\n") +
-                                              str(fly_requests(context.user_data)[i][3] + "\n") +
-                                              str(fly_requests(context.user_data)[i][4] + "\n") +
-                                              str(fly_requests(context.user_data)[i][5] + "\n"))
-                else:
-                    update.message.reply_text(str(fly_requests(context.user_data)[i][0] + "\n") +
-                                              str(fly_requests(context.user_data)[i][1] + "\n") +
-                                              str(fly_requests(context.user_data)[i][2] + "\n") +
-                                              str(fly_requests(context.user_data)[i][3] + "\n") +
-                                              str(fly_requests(context.user_data)[i][4] + "\n"))
-            else:
-                update.message.reply_text(str(fly_requests(context.user_data)[i][0] + "\n") +
-                                          str(fly_requests(context.user_data)[i][1] + "\n") +
-                                          str(fly_requests(context.user_data)[i][2] + "\n") +
-                                          str(fly_requests(context.user_data)[i][3] + "\n"))
-        else:
-            update.message.reply_text(str(fly_requests(context.user_data)[i][0] + "\n") +
-                                      str(fly_requests(context.user_data)[i][1] + "\n") +
-                                      str(fly_requests(context.user_data)[i][2] + "\n"))
+    session_2 = db_session.create_session()
+    user = session_2.query(LocalRequests).first()
+    local_requests = LocalRequests()
+    if fly_requests(context.user_data) == 8:
+        for user in session_2.query(LocalRequests).filter(LocalRequests.id < int(context.user_data['limit'])):
+            update.message.reply_text(user.origin + "\n" + user.destination + "\n" +
+                                      user.value + "\n" + user.depart_date + "\n" + user.return_date + '\n' + user.gate)
+        session_2.query(LocalRequests).delete()
+        session_2.commit()
+    return -1
+
+
+def fallback(update, context):
     return ConversationHandler.END
 
 
-def stop(update, context):
-
-    update.message.reply_text('Пока! Надеюсь, что я вам помог.')
-
-    return ConversationHandler.END
+def error(update, context):
+    """Log Errors caused by Updates."""
+    logger.warning('Update "%s" caused error "%s"', update, context.error)
 
 
 def main():
@@ -185,12 +181,15 @@ def main():
         },
 
         # Точка прерывания диалога. В данном случае — команда /stop.
-        fallbacks=[CommandHandler('stop', stop)]
+        fallbacks=[CommandHandler('stop', fallback)]
     )
+    dp.add_handler(CommandHandler('start', start))
+    dp.add_handler(CommandHandler('stop', fallback))
+    dp.add_handler(CommandHandler('help', help))
     dp.add_handler(conversation_handler)
-    # dp.add_handler(CommandHandler("start", start))
-    dp.add_handler(CommandHandler("city_name", city_name))
 
+    dp.add_handler(CommandHandler("city_name", city_name))
+    dp.add_error_handler(error)
     updater.start_polling()
 
     updater.idle()

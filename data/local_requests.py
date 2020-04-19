@@ -15,6 +15,5 @@ class LocalRequests(SqlAlchemyBase):
     depart_date = sqlalchemy.Column(sqlalchemy.String, nullable=True)
     return_date = sqlalchemy.Column(sqlalchemy.String, nullable=True)
     number_of_changes = sqlalchemy.Column(sqlalchemy.Integer, nullable=True)
-    created_date = sqlalchemy.Column(sqlalchemy.DateTime,
-                                     default=datetime.datetime.now)
-
+    value = sqlalchemy.Column(sqlalchemy.Integer, nullable=True)
+    gate = sqlalchemy.Column(sqlalchemy.String, nullable=True)
