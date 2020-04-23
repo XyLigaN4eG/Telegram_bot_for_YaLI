@@ -1,3 +1,4 @@
+import tickets
 from data import db_session
 import logging
 from data.local_requests import LocalRequests
@@ -6,11 +7,17 @@ from fly_requests import fly_requests
 from telegram import ReplyKeyboardMarkup
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, ConversationHandler
 
+from flask import Flask
+
+
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
                     level=logging.INFO)
 
+
 logger = logging.getLogger(__name__)
 db_session.global_init("db/local_requests.sqlite")
+
+
 CITY_NAME, ONE_WAY, BEGINNING_OF_PERIOD, TRIP_DURATION, LIMITER, REQUESTER = range(6)
 db_session.global_init("db/local_requests.sqlite")
 reply_keyboard = [['Да', 'Нет']]
@@ -115,7 +122,7 @@ def limiter(update, context):
     if " " not in str(update.message.text):
         if str(update.message.text).isdigit():
             context.user_data['limit'] = update.message.text
-            return REQUESTER
+            return requester(update, context)
         else:
             update.message.reply_text("Вы неправильно ввели максимальное количество предложений. Попробуйте ещё раз.")
             return LIMITER
@@ -123,7 +130,7 @@ def limiter(update, context):
         limit_name = str(update.message.text).split(" ")
         if str(limit_name[0]).isdigit():
             context.user_data['limit'] = limit_name[0]
-            return REQUESTER
+            return requester(update, context)
         else:
             update.message.reply_text("Вы неправильно ввели максимальное количество предложений. Попробуйте ещё раз.")
             return LIMITER
@@ -137,12 +144,8 @@ def requester(update, context):
     user = session_2.query(LocalRequests).first()
     local_requests = LocalRequests()
     if fly_requests(context.user_data) == 8:
-        for user in session_2.query(LocalRequests).filter(LocalRequests.id < int(context.user_data['limit'])):
-            update.message.reply_text(user.origin + "\n" + user.destination + "\n" +
-                                      user.value + "\n" + user.depart_date + "\n" + user.return_date + '\n' + user.gate)
-        session_2.query(LocalRequests).delete()
-        session_2.commit()
-    return -1
+        print(tickets.get_tickets())
+    return ConversationHandler.END
 
 
 def fallback(update, context):
@@ -183,10 +186,9 @@ def main():
         # Точка прерывания диалога. В данном случае — команда /stop.
         fallbacks=[CommandHandler('stop', fallback)]
     )
-    dp.add_handler(CommandHandler('start', start))
-    dp.add_handler(CommandHandler('stop', fallback))
-    dp.add_handler(CommandHandler('help', help))
     dp.add_handler(conversation_handler)
+
+    dp.add_handler(CommandHandler('help', help))
 
     dp.add_handler(CommandHandler("city_name", city_name))
     dp.add_error_handler(error)
