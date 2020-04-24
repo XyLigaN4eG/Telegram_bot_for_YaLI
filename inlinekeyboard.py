@@ -3,19 +3,19 @@ from data import db_session
 import logging
 from data.local_requests import LocalRequests
 from citytoiata import city_to_iata
-from fly_requests import fly_requests
+from fly_requests import fly_requests, app
 from telegram import ReplyKeyboardMarkup
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, ConversationHandler
-
 from flask import Flask
 
+app_context = app.app_context()
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
                     level=logging.INFO)
 
 
 logger = logging.getLogger(__name__)
-db_session.global_init("db/local_requests.sqlite")
+
 
 
 CITY_NAME, ONE_WAY, BEGINNING_OF_PERIOD, TRIP_DURATION, LIMITER, REQUESTER = range(6)
