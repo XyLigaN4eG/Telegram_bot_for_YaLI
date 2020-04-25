@@ -1,3 +1,1 @@
-from requests import get
-
-print(get('http://localhost:5000/tickets'))
+print(10 ** -27)

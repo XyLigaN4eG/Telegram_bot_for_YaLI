@@ -1,11 +1,12 @@
 
 import sqlalchemy
+from flask_login import UserMixin
 from sqlalchemy_serializer import SerializerMixin
 
 from .db_session import SqlAlchemyBase
 
 
-class LocalRequests(SqlAlchemyBase, SerializerMixin):
+class LocalRequests(SqlAlchemyBase, UserMixin, SerializerMixin):
     __tablename__ = 'local_requests'
 
     id = sqlalchemy.Column(sqlalchemy.Integer,

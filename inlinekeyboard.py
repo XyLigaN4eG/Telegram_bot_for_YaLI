@@ -7,19 +7,17 @@ from fly_requests import fly_requests, app
 from telegram import ReplyKeyboardMarkup
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, ConversationHandler
 from flask import Flask
-
+import tickets
 app_context = app.app_context()
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
                     level=logging.INFO)
 
-
 logger = logging.getLogger(__name__)
-
-
 
 CITY_NAME, ONE_WAY, BEGINNING_OF_PERIOD, TRIP_DURATION, LIMITER, REQUESTER = range(6)
 db_session.global_init("db/local_requests.sqlite")
+app.register_blueprint(tickets_requests.blueprint)
 reply_keyboard = [['Да', 'Нет']]
 reply_keyboard_date = [[f'']]
 markup = ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=True, resize_keyboard=True)
@@ -143,8 +141,8 @@ def requester(update, context):
     session_2 = db_session.create_session()
     user = session_2.query(LocalRequests).first()
     local_requests = LocalRequests()
-    if fly_requests(context.user_data) == 8:
-        print(tickets.get_tickets())
+    # if fly_requests(context.user_data) == 8:
+    # print(tickets.get_tickets())
     return ConversationHandler.END
 
 
@@ -158,6 +156,7 @@ def error(update, context):
 
 
 def main():
+
     # Создаём объект updater.
     # Вместо слова "TOKEN" надо разместить полученный от @BotFather токен
     updater = Updater("1213624266:AAFEhfCRLn-0nGulWqs5RJMrSJqgUhG8Q9s", use_context=True,
