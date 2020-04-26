@@ -132,6 +132,7 @@ def limiter(update, context):
 
 
 def requester(update, context):
+    update.message.reply_text('pass')
     session_2 = db_session.create_session()
     user = session_2.query(LocalRequests).first()
     local_requests = LocalRequests()

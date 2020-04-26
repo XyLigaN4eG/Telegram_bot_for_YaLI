@@ -39,9 +39,8 @@ def fly_requests(user_dict):
                    " в другое время."
         else:
             for i in json_response["data"]:
-                rest_requests = 'http://localhost:5000/api/news'
+                rest_requests = 'http://localhost:5000/api/tickets'
                 params = {
-                    "id": i['id'],
                     "iata_origin": i['iata_origin'],
                     "iata_destination": i['iata_destination'],
                     "origin": i['origin'],

@@ -8,7 +8,6 @@ parser.add_argument('iata_destination', type=str, required=True)
 parser.add_argument('iata_origin', type=str, required=True)
 parser.add_argument('origin', type=str, required=True)
 parser.add_argument('destination', type=str, required=True)
-parser.add_argument('id', type=int, required=True)
 parser.add_argument('gate', type=str, required=True)
 parser.add_argument('return_date', type=str, required=True)
 parser.add_argument('number_of_changes', type=int, required=True)
@@ -60,7 +59,6 @@ class RestForCollection(Resource):
         args = parser.parse_args()
         session = db_session.create_session()
         news = LocalRequests()
-        news.id = args.id
         news.iata_origin = args.iata_origin
         news.iata_destination = args.iata_destination
         news.origin = args.origin
