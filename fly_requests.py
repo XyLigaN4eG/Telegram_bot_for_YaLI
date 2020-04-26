@@ -1,4 +1,5 @@
 import requests
+from requests import post
 from data import db_session
 from data.local_requests import LocalRequests
 from flask import Flask
@@ -38,17 +39,20 @@ def fly_requests(user_dict):
                    " в другое время."
         else:
             for i in json_response["data"]:
-                db_parser = LocalRequests()
-                db_parser.origin = ("Город(аэропорт) отправления: " + i["origin"])
-                db_parser.destination = ("Город(аэропорт) прибытия: " + i["destination"])
-                db_parser.value = (str(i["value"]) + " рублей")
-                db_parser.depart_date = ("Время отправления: " + str(i["depart_date"]).replace("-", '.'))
-                db_parser.return_date = ("Время возвращения: " + str(i["return_date"]).replace("-", '.'))
-                db_parser.number_of_changes = ("Количество пересадок: " + str(i["number_of_changes"]))
-                db_parser.gate = i['gate']
-                session = db_session.create_session()
-                session.add(db_parser)
-                session.commit()
+                rest_requests = 'http://localhost:5000/api/news'
+                params = {
+                    "id": i['id'],
+                    "iata_origin": i['iata_origin'],
+                    "iata_destination": i['iata_destination'],
+                    "origin": i['origin'],
+                    "destination": i['destination'],
+                    "depart_date": i['depart_date'],
+                    "return_date": i['return_date'],
+                    "number_of_changes": i['number_of_changes'],
+                    "value": i['value'],
+                    "gate": i['gate']
+                }
+                response = requests.post(rest_requests, params=params)
         return success
 
     except KeyError:

@@ -8,6 +8,7 @@ from telegram import ReplyKeyboardMarkup
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, ConversationHandler
 from flask import Flask
 import tickets
+
 app_context = app.app_context()
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -17,16 +18,9 @@ logger = logging.getLogger(__name__)
 
 CITY_NAME, ONE_WAY, BEGINNING_OF_PERIOD, TRIP_DURATION, LIMITER, REQUESTER = range(6)
 db_session.global_init("db/local_requests.sqlite")
-app.register_blueprint(tickets_requests.blueprint)
 reply_keyboard = [['Да', 'Нет']]
 reply_keyboard_date = [[f'']]
 markup = ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=True, resize_keyboard=True)
-REQUEST_KWARGS = {
-    'proxy_url': 'socks5://orbtl.s5.opennetwork.cc:999',
-    'urllib3_proxy_kwargs': {
-        'username': '429604643',
-        'password': '3mDjU04i'}
-}
 
 
 def help(update, context):
@@ -141,9 +135,13 @@ def requester(update, context):
     session_2 = db_session.create_session()
     user = session_2.query(LocalRequests).first()
     local_requests = LocalRequests()
-    # if fly_requests(context.user_data) == 8:
-    # print(tickets.get_tickets())
-    return ConversationHandler.END
+    if fly_requests(context.user_data) == 8:
+        for user in session_2.query(LocalRequests).filter(LocalRequests.id < int(context.user_data['limit'])):
+            update.message.reply_text(user.origin + "\n" + user.destination + "\n" +
+                                      user.value + "\n" + user.depart_date + "\n" + user.return_date + '\n' + user.gate)
+        session_2.query(LocalRequests).delete()
+        session_2.commit()
+    return -1
 
 
 def fallback(update, context):
@@ -156,11 +154,9 @@ def error(update, context):
 
 
 def main():
-
     # Создаём объект updater.
     # Вместо слова "TOKEN" надо разместить полученный от @BotFather токен
-    updater = Updater("1213624266:AAFEhfCRLn-0nGulWqs5RJMrSJqgUhG8Q9s", use_context=True,
-                      request_kwargs=REQUEST_KWARGS)
+    updater = Updater("1213624266:AAFEhfCRLn-0nGulWqs5RJMrSJqgUhG8Q9s", use_context=True)
 
     # Получаем из него диспетчер сообщений.
     dp = updater.dispatcher
