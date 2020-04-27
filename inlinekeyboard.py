@@ -134,14 +134,16 @@ def limiter(update, context):
 def requester(update, context):
     update.message.reply_text('pass')
     session_2 = db_session.create_session()
-    user = session_2.query(LocalRequests).first()
-    local_requests = LocalRequests()
+    # user = session_2.query(LocalRequests).first()
+    # local_requests = LocalRequests()
     if fly_requests(context.user_data) == 8:
-        for user in session_2.query(LocalRequests).filter(LocalRequests.id < int(context.user_data['limit'])):
+        for user in session_2.query(LocalRequests).filter(int(LocalRequests.id) < int(context.user_data['limit'])):
             update.message.reply_text(user.origin + "\n" + user.destination + "\n" +
                                       user.value + "\n" + user.depart_date + "\n" + user.return_date + '\n' + user.gate)
         session_2.query(LocalRequests).delete()
         session_2.commit()
+    else:
+        update.message.reply_text(fly_requests(context.user_data))
     return -1
 
 
