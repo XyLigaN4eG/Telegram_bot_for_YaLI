@@ -1,1 +1,1 @@
-web: python inlinekeyboard.py
+web: python main.py
