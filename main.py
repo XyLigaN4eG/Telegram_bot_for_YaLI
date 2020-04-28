@@ -1,20 +1,25 @@
-import tickets
-from data import db_session
 import logging
-from data.local_requests import LocalRequests
-from citytoiata import city_to_iata
-from fly_requests import fly_requests, app
 from telegram import ReplyKeyboardMarkup
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, ConversationHandler
-from flask import Flask
-import tickets
-
-app_context = app.app_context()
+from citytoiata import city_to_iata
+from data import db_session
+from data.local_requests import LocalRequests
+from fly_requests import fly_requests
+import os
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
                     level=logging.INFO)
 
-logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.DEBUG)
+
+
+def log():
+    logging.debug('Debug')
+    logging.info('Info')
+    logging.warning('Warning')
+    logging.error('Error')
+    logging.critical('Critical or Fatal')
+
 
 CITY_NAME, ONE_WAY, BEGINNING_OF_PERIOD, TRIP_DURATION, LIMITER, REQUESTER = range(6)
 db_session.global_init("db/local_requests.sqlite")
@@ -23,25 +28,31 @@ reply_keyboard_date = [[f'']]
 markup = ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=True, resize_keyboard=True)
 
 
-def help(update, context):
+def tg_help(update, context):
     update.message.reply_text("Моей основной задачей является подбор авиабилетов, но вот с их "
                               "покупкой я пока не дружу :(\n Пропишите  команду /start, чтобы начать выбор билетов,"
-                              "или команду /stop, чтобы прервать мою работу")
+                              "или команду /stop, чтобы прервать мою работу.")
 
 
 def start(update, context):
     update.message.reply_text(
         "Привет. Я бот, который поможет вам купить авиабилеты!\n"
         "Вы можете узнать, на что я способен, просто прописав команду /help.\n"
-        "Откуда и куда вы хотите направиться? Пример: из Казани в Москву")
+        "Откуда и куда вы хотите направиться? Пример: из Казани в Москву.")
 
     return CITY_NAME
 
 
 def city_name(update, context):
+    if str(update.message.text) == '/stop':
+        return ConversationHandler.END
     dest_and_origin = str(city_to_iata(update.message.text, context.user_data)).split(",")
-    context.user_data['or'] = dest_and_origin[0].replace("(", "").replace(")", "").replace("'", "")
-    context.user_data['dest'] = dest_and_origin[1].replace("(", "").replace(")", "").replace("'", "").replace(" ", "")
+    if len(dest_and_origin[0]) != 0:
+        context.user_data['or'] = dest_and_origin[0].replace("(", "").replace(")", "").replace("'", "")
+        context.user_data['dest'] = dest_and_origin[1].replace("(", "").replace(")", "").replace("'", "").replace(" ",
+                                                                                                                  "")
+    else:
+        update.message.reply_text("Ой-ой, что-то пошло не так. Проверьте правильность написания.")
     if context.user_data['or'] == context.user_data['dest']:
         update.message.reply_text("Ой-ой, кажется город отправления и прибытия совпадают. Попробуйте ещё раз.")
         return CITY_NAME
@@ -52,21 +63,25 @@ def city_name(update, context):
 
 
 def one_way(update, context):
+    if str(update.message.text) == '/stop':
+        return ConversationHandler.END
     if str(update.message.text) == "да" or str(update.message.text) == "Да" or str(update.message.text) == "ДА":
         context.user_data['one_way'] = "false"
         update.message.reply_text("Какова будет длительность путешествия в неделях?")
         return TRIP_DURATION
     elif str(update.message.text) == 'нет' or str(update.message.text) == "Нет" or str(update.message.text) == 'НЕТ':
         context.user_data['one_way'] = "true"
-
+        context.user_data['trip_duration'] = 0
         update.message.reply_text("Введите первое число месяца, в который будут попадать даты отправления.(DD.MM.YYYY)")
         return BEGINNING_OF_PERIOD
     else:
-        update.message.reply_text("Введите корректный ответ")
+        update.message.reply_text("Введите корректный ответ.")
         return ONE_WAY
 
 
 def trip_duration(update, context):
+    if str(update.message.text) == '/stop':
+        return ConversationHandler.END
     if " " not in str(update.message.text):
         if str(update.message.text).isdigit():
             update.message.reply_text(
@@ -94,6 +109,8 @@ def trip_duration(update, context):
 
 
 def beginning_of_period(update, context):
+    if str(update.message.text) == '/stop':
+        return ConversationHandler.END
     if "." in update.message.text:
         normal_date = str(update.message.text).split('.')
         if str(normal_date[0]).isdigit() and str(normal_date[1]).isdigit() and str(normal_date[2]).isdigit():
@@ -111,6 +128,8 @@ def beginning_of_period(update, context):
 
 
 def limiter(update, context):
+    if str(update.message.text) == '/stop':
+        return ConversationHandler.END
     if " " not in str(update.message.text):
         if str(update.message.text).isdigit():
             context.user_data['limit'] = update.message.text
@@ -132,47 +151,35 @@ def limiter(update, context):
 
 
 def requester(update, context):
-    update.message.reply_text('pass')
+
     session_2 = db_session.create_session()
-    # user = session_2.query(LocalRequests).first()
-    # local_requests = LocalRequests()
+
     if fly_requests(context.user_data) == 8:
-        for user in session_2.query(LocalRequests).filter(int(LocalRequests.id) < int(context.user_data['limit'])):
-            update.message.reply_text(user.origin + "\n" + user.destination + "\n" +
-                                      user.value + "\n" + user.depart_date + "\n" + user.return_date + '\n' + user.gate)
+        for user in session_2.query(LocalRequests).filter(LocalRequests.id < int(context.user_data['limit'])):
+            update.message.reply_text(str(user.origin) + "\n" + str(user.destination) + "\n" +
+                                      str(user.value) + "\n" + str(user.depart_date) + "\n" + str(
+                user.return_date) + '\n' + str(user.gate))
         session_2.query(LocalRequests).delete()
         session_2.commit()
     else:
-        update.message.reply_text(fly_requests(context.user_data))
-    return -1
+        update.message.reply_text(
+            "К сожалению на данный момент билеты на подобные рейсы отсутствуют. Попытайтесь в другое время.")
+    return ConversationHandler.END
 
 
 def fallback(update, context):
     return ConversationHandler.END
 
 
-def error(update, context):
-    """Log Errors caused by Updates."""
-    logger.warning('Update "%s" caused error "%s"', update, context.error)
-
-
 def main():
-    # Создаём объект updater.
-    # Вместо слова "TOKEN" надо разместить полученный от @BotFather токен
-    updater = Updater("1213624266:AAFEhfCRLn-0nGulWqs5RJMrSJqgUhG8Q9s", use_context=True)
+    updater = Updater("1291892923:AAGFf_G_ETvtISyXJC9_tSJnZAG9hPdVnDA", use_context=True)
 
-    # Получаем из него диспетчер сообщений.
     dp = updater.dispatcher
 
     conversation_handler = ConversationHandler(
-        # Точка входа в диалог.
-        # В данном случае — команда /start. Она задаёт первый вопрос.
         entry_points=[CommandHandler('start', start)],
 
-        # Состояние внутри диалога.
-        # Вариант с двумя обработчиками, фильтрующими текстовые сообщения.
         states={
-            # Функция читает ответ на первый вопрос и задаёт второй.
             CITY_NAME: [MessageHandler(Filters.text, city_name, pass_user_data=True)],
             ONE_WAY: [MessageHandler(Filters.text, one_way, pass_user_data=True)],
             TRIP_DURATION: [MessageHandler(Filters.text, trip_duration, pass_user_data=True)],
@@ -181,15 +188,13 @@ def main():
             REQUESTER: [MessageHandler(Filters.text, requester, pass_user_data=True)]
         },
 
-        # Точка прерывания диалога. В данном случае — команда /stop.
         fallbacks=[CommandHandler('stop', fallback)]
     )
     dp.add_handler(conversation_handler)
 
-    dp.add_handler(CommandHandler('help', help))
+    dp.add_handler(CommandHandler('tg_help', help))
 
     dp.add_handler(CommandHandler("city_name", city_name))
-    dp.add_error_handler(error)
     updater.start_polling()
 
     updater.idle()
@@ -197,3 +202,5 @@ def main():
 
 if __name__ == '__main__':
     main()
+    log()
+    os.system('python tickets.py')

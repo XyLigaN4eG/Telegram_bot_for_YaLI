@@ -1,7 +1,9 @@
 import requests
-import datetime
+
+error = -1
 
 
+# Преобразует название городов в из IATA—коды
 def city_to_iata(text, user_dict):
     api_server = "https://www.travelpayouts.com/widgets_suggest_params"
     params = {
@@ -17,6 +19,4 @@ def city_to_iata(text, user_dict):
         return j_response["origin"]["iata"], j_response["destination"]["iata"]
 
     except KeyError:
-        pass
-
-
+        return error
