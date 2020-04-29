@@ -1,8 +1,10 @@
 import requests
+from flask_restful import Api
 from requests import post
 from data import db_session
 from flask import Flask
-
+app = Flask(__name__)
+api = Api(app)
 db_session.global_init("db/local_requests.sqlite")
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'yandexlyceum_secret_key'
@@ -32,9 +34,7 @@ def fly_requests(user_dict):
             return "Упс, мне сообщили, что таких рейсов сейчас нет. Мне очень жаль, попробуйте повторить запрос" \
                    " в другое время."
         else:
-            print('apss2')
             for i in json_response["data"]:
-                print('211')
                 rest_requests = 'http://localhost:5000/api/v2/tickets'
                 params = {
                     "origin": "Город(аэропорт) отправления: " + i['origin'],
@@ -46,7 +46,7 @@ def fly_requests(user_dict):
                     "gate": i['gate']
                 }
                 print(post(rest_requests, params=params))
-                print('apss3')
+                print('200')
         return SUCCESS
 
     except KeyError:

@@ -3,6 +3,7 @@ import flask
 from flask import Flask
 from data import db_session
 from data.local_requests import LocalRequests
+import main as main1
 
 parser = reqparse.RequestParser()
 parser.add_argument('origin', type=str, required=True)
@@ -13,8 +14,6 @@ parser.add_argument('number_of_changes', type=str, required=True)
 parser.add_argument('depart_date', type=str, required=True)
 parser.add_argument('value', type=str, required=True)
 db_session.global_init("db/local_requests.sqlite")
-app = Flask(__name__)
-app.config['SECRET_KEY'] = 'yandexlyceum_secret_key'
 
 app = Flask(__name__)
 api = Api(app)
@@ -72,5 +71,6 @@ class RestForCollection(Resource):
 
 api.add_resource(RestForCollection, '/api/v2/tickets')
 api.add_resource(RESTForOneObject, '/api/v2/tickets/<int:id>')
+
 if __name__ == '__main__':
     app.run()
