@@ -102,6 +102,9 @@ def trip_duration(update, context):
         return tg_help(update, context)
     if str(update.message.text) == '/stop':
         return ConversationHandler.END
+    if int(update.message.text) > 4:
+        update.message.reply_text("Введите корректный ответ.")
+        return TRIP_DURATION
     if " " not in str(update.message.text):
         if str(update.message.text).isdigit():
             update.message.reply_text(
